@@ -25,8 +25,7 @@ function AIModule(areaX, areaY)
 	{
 		this.schemeForProjection = createScheme(Angel.schemeForProjectionLength, Angel.maxSchemeIndex);
 		this.schemeForMemory = createScheme(Angel.memorySize, Angel.maxSchemeIndex);
-		this.memory = new AngelMemory();
-		this.memory.copyFromArray(createMemory(Angel.memorySize));
+		this.memory = createMemory(Angel.memorySize);
 		this.projections = [];
 		this.portfolio = [];
 		this.projectionStartCount = 0;
@@ -148,8 +147,7 @@ function AIModule(areaX, areaY)
 	{
 		this.schemeForPlan = createScheme(Soul.schemeForPlanLength, Soul.maxSchemeIndex);
 		this.schemeForMemory = createScheme(Soul.memorySize, Soul.maxSchemeIndex);
-		this.memory = new SoulMemory();
-		this.memory.copyFromArray(createMemory(Soul.memorySize));
+		this.memory = createMemory(Soul.memorySize);
 		this.suggestedPlan = [];
 		
 		this.doPlanningCycle = function(anAngel, currentSensor)
@@ -170,7 +168,7 @@ function AIModule(areaX, areaY)
 		}
 	}
 	
-	function AbstractBitFieldNumber()
+	function BitFieldNumber()
 	{
 		this.setNumber = function(address, number, capacity)
 		{
@@ -229,7 +227,7 @@ function AIModule(areaX, areaY)
 		{
 			var i, x, y;
 			
-			i = this.areaAddress;
+			i = Sensor.areaAddress;
 			for (y = 0; y < area.y; y++) {
 				for (x = 0; x < area.x; x++) {
 					if (area.board[y][x]) {
@@ -253,7 +251,7 @@ function AIModule(areaX, areaY)
 			for ( ; y < puzzle.board.length; y++) {
 				for (x = 0; x < puzzle.board[y].length; x++) {
 					if (puzzle.board[y][x]) {
-						j = this.areaAddress + (puzzle.y + y) * area.x + puzzle.x + x;
+						j = Sensor.areaAddress + (puzzle.y + y) * area.x + puzzle.x + x;
 						this.bitField[j] = true;
 					}
 				}
@@ -262,11 +260,11 @@ function AIModule(areaX, areaY)
 			return false;
 		}
 		
-		this.setNextPuzzle = function(nextPuzzleRaw, biggestDimensionY, biggestDimensionX)
+		this.setNextPuzzle = function(nextPuzzleRaw)
 		{
 			var i, x, y;
 			
-			i = this.nextPuzzleAddress;
+			i = Sensor.nextPuzzleAddress;
 			for (y = 0; y < nextPuzzleRaw.length; y++) {
 				for (x = 0; x < nextPuzzleRaw[y].length; x++) {
 					if (nextPuzzleRaw[y][x]) {
@@ -276,13 +274,13 @@ function AIModule(areaX, areaY)
 					}
 					i++;
 				}
-				for ( ; x < biggestDimensionX; x++) {
+				for ( ; x < AIModule.biggestPuzzleXLength; x++) {
 					this.bitField[i] = false;
 					i++;
 				}
 			}
-			for ( ; y < biggestDimensionY; y++) {
-				for (x = 0 ; x < biggestDimensionX; x++) {
+			for ( ; y < AIModule.biggestPuzzleYLength; y++) {
+				for (x = 0 ; x < AIModule.biggestPuzzleXLength; x++) {
 					this.bitField[i] = false;
 					i++;
 				}
@@ -328,7 +326,7 @@ function AIModule(areaX, areaY)
 			return false;
 		}
 	}
-	Sensor.prototype = new AbstractBitFieldNumber();
+	Sensor.prototype = new BitFieldNumber();
 
 	function ProjectedSensor()
 	{
@@ -343,7 +341,7 @@ function AIModule(areaX, areaY)
 			return r;
 		}
 	}
-	ProjectedSensor.prototype = new AbstractBitFieldNumber();
+	ProjectedSensor.prototype = new BitFieldNumber();
 	
 	function SuggestedActuators()
 	{
@@ -373,7 +371,7 @@ function AIModule(areaX, areaY)
 			return r;
 		}
 	}
-	SuggestedActuators.prototype = new AbstractBitFieldNumber();
+	SuggestedActuators.prototype = new BitFieldNumber();
 
 	function Projection(parentAngel, startSensor, aplan)
 	{
@@ -528,8 +526,10 @@ function AIModule(areaX, areaY)
 		}
 	}
 	
-	function AbstractMemory()
+	function BitFieldMemory(memorySize)
 	{
+		this.bitField = new Array(memorySize);
+		
 		this.copy = function(source)
 		{
 			for (var k = 0; k < source.bitField.length; k++) {
@@ -556,33 +556,10 @@ function AIModule(areaX, areaY)
 			
 			return false;
 		}
-	}
-
-	function AngelMemory()
-	{
-		this.bitField = new Array(Angel.memorySize);
 		
 		this.clone = function()
 		{
-			var r = new AngelMemory();
-			
-			for (var k = 0; k < r.bitField.length; k++) {
-				r.bitField[k] = this.bitField[k];
-			}
-			
-			return r;
-		}
-		
-	}
-	AngelMemory.prototype = new AbstractMemory();
-
-	function SoulMemory()
-	{
-		this.bitField = new Array(Soul.memorySize);
-		
-		this.clone = function()
-		{
-			var r = new SoulMemory();
+			var r = new BitFieldMemory(this.bitField.length);
 			
 			for (var k = 0; k < r.bitField.length; k++) {
 				r.bitField[k] = this.bitField[k];
@@ -591,12 +568,11 @@ function AIModule(areaX, areaY)
 			return r;
 		}
 	}
-	SoulMemory.prototype = new AbstractMemory();
 
 	function ElementOfScheme()
 	{
 		this.number;
-		this.negative;
+		this.negation;
 	}
 
 	function ElementOfPortfolio()
@@ -643,6 +619,21 @@ function AIModule(areaX, areaY)
 		}
 	}
 
+	function createElementOfScheme(maxi)
+	{
+		var r = new ElementOfScheme();
+		
+		r.number = Math.round(Math.random() * maxi * 2);
+		if ((r.number % 2) == 0) {
+			r.negation = false;
+		} else {
+			r.negation = true;
+		}
+		r.number >>= 1;
+		
+		return r;
+	}
+
 	function createScheme(schemeLen, maxi)
 	{
 		var r = new Array();
@@ -658,14 +649,7 @@ function AIModule(areaX, areaY)
 				r[i].push(sor);
 				w = Math.round(Math.random() * AIModule.schemeAndSize) + 1;
 				for (var k = 0; k < w; k++) {
-					sand = new ElementOfScheme();
-					sand.number = Math.round(Math.random() * maxi * 2);
-					if ((sand.number % 2) == 1) {
-						sand.negative = true;
-					} else {
-						sand.negative = false;
-					}
-					sand.number >>= 1;
+					sand = createElementOfScheme(maxi);
 					r[i][j].push(sand);
 				}
 			}
@@ -674,86 +658,80 @@ function AIModule(areaX, areaY)
 		return r;
 	}
 
-	function calculateScheme(logicalScheme, asensor, anAngelMemory)
-	{
-		var i, j, ne, nm, nx, r;
-		
-		r = false;
-		for (i = 0; i < logicalScheme.length; i++) {
-			r = true;
-			for (j = 0; j < logicalScheme[i].length; j++) {
-				nm = logicalScheme[i][j].number;
-				if (nm < asensor.bitField.length) {
-					nx = asensor.bitField[nm];
-				} else {
-					nm -= asensor.bitField.length;
-					nx = anAngelMemory.bitField[nm];
-				}
-				ne = logicalScheme[i][j].negative;
-				if (!(ne || nx)) { r = false; break; }
-				if (ne && nx) { r = false; break; }
-			}
-			if (r) { break; }
-		}
-		
-		return r;
-	}
-
-	function calculateAllScheme(destination, logicalSchemes, asensor, anAngelMemory)
-	{
-		for (var k = 0; k < logicalSchemes.length; k++) {
-			destination.bitField[k] = calculateScheme(logicalSchemes[k], asensor, anAngelMemory);
-		}
-		
-		return false;
-	}
-
-	function calculateAllSchemeExtra(endAngelMemory, logicalSchemes, asensor, startAngelMemory)
-	{
-		var i, k;
-		var temporaryMemory;
-		
-		calculateAllScheme(endAngelMemory, logicalSchemes, asensor, startAngelMemory);
-		i = endAngelMemory.bitField.length >> 1;
-		if (i > 0) {
-			temporaryMemory = new AngelMemory();
-			do {
-				for (k = 0; k < i; k++) {
-					temporaryMemory.bitField[k] = calculateScheme(logicalSchemes[k], asensor, endAngelMemory);
-				}
-				endAngelMemory.copyPartial(temporaryMemory, 0, 0, i)
-				i >>= 1;
-			} while (i > 0)
-		}
-		
-		return false;
-	}
-
-	function createMemory(memoryLen)
-	{
-		var r = new Array();
-		var v;
-		
-		for (var i = 0; i < memoryLen; i++) {
-			v = Math.round(Math.random());
-			if (v == 0) {
-				r.push(false);
-			} else {
-				r.push(true);
-			}
-		}
-		
-		return r;
-	}
-
 	function createSchemeByGeneAlgorithm(firstLogicalSchemeAll, secondLogicalSchemeAll, maxi)
 	{
+		function iterateThroughScheme(logicalSchemeAll)
+		{
+			if (crossoverFlag2) { crossoverFlag3 = true; }
+			crossoverFlag2 = false;
+			while (j < logicalSchemeAll[i].length) {
+				if ((!crossoverFlag3) || (r[i].length == 0)) {
+					sor = new Array();
+					r[i].push(sor);
+				}
+				crossoverFlag3 = false;
+				while (k < logicalSchemeAll[i][j].length) {
+					if (crossoverFlag1 && (m == j) && (n == k)) {
+						crossoverFlag2 = true;
+						break;
+					}
+					if (mutationCount == 0) {
+						sand = createElementOfScheme(maxi);
+						mutationCount = Math.round(Math.random() * u);
+					} else {
+						sand = new ElementOfScheme();
+						sand.number = logicalSchemeAll[i][j][k].number;
+						if ((sand.number >= transferSourceIndex) && (sand.number <= transferSourceEndIndex) && transferDirection) {
+							sand.number += transferOffset;
+							transferDirection = !transferDirection;
+						}
+						sand.negation = logicalSchemeAll[i][j][k].negation;
+						mutationCount--;
+					}
+					r[i][j].push(sand);
+					k++;
+				}
+				if (crossoverFlag1 && (m == j) && (logicalSchemeAll[i][j].length == 0)) {
+					crossoverFlag2 = true;
+				}
+				if (crossoverFlag2) {
+					break;
+				} else {
+					k = 0;
+				}
+				j++;
+			}
+			if (crossoverFlag1 && (logicalSchemeAll[i].length == 0)) {
+				crossoverFlag2 = true;
+			}
+			if (crossoverFlag2) {
+				crossoverDirection = !crossoverDirection;
+			} else {
+				j = 0;
+				k = 0;
+				crossoverFlag3 = false;
+			}
+		}
+		
+		function initCrossoverAddresses(logicalSchemeAll)
+		{
+			if (logicalSchemeAll[i].length > 0 ) {
+				m = crossoverAddresses2[t] * (logicalSchemeAll[i].length - 1);
+				n = (m - Math.floor(m));
+				m = Math.round(m);
+				if (logicalSchemeAll[i][m].length > 0 ) {
+					n *= (logicalSchemeAll[i][m].length - 1);
+					n = Math.round(n);
+				}
+			}
+		}
+		
 		var r = new Array();
 		var crossoverAddresses1 = [];
 		var crossoverAddresses2 = [];
 		var transferSourceIndex, transferDestinationIndex, transferOffset, transferSize, transferSourceEndIndex, transferDestinationEndIndex;
 		var mutationCount;
-		var crossoverDirection, crossoverFlag1, crossoverFlag2, transferDirection;
+		var crossoverDirection, crossoverFlag1, crossoverFlag2, crossoverFlag3, transferDirection;
 		var s, sor, sand;
 		var i, j, k, m, n, t, u;
 		
@@ -769,7 +747,7 @@ function AIModule(areaX, areaY)
 		transferSize = Math.round(t * u) + 1;
 		transferSourceIndex = Math.round(Math.random() * (firstLogicalSchemeAll.length - transferSize));
 		transferSourceEndIndex = transferSourceIndex + transferSize - 1;
-		transferDestinationIndex = Math.round(Math.random() * (firstLogicalSchemeAll.length - 1));
+		transferDestinationIndex = Math.round(Math.random() * (firstLogicalSchemeAll.length - transferSize));
 		transferDestinationEndIndex = transferDestinationIndex + transferSize - 1;
 		transferOffset = transferDestinationIndex - transferSourceIndex;
 		for (i = 0; i < ((transferSize % 7) + 1); i++) {
@@ -780,156 +758,55 @@ function AIModule(areaX, areaY)
 		u = 12;
 		mutationCount = Math.round(Math.random() * u);
 		
-		j = 0; k = 0;
+		i = 0; j = 0; k = 0;
 		crossoverFlag2 = false;
-		for (i = 0; i < firstLogicalSchemeAll.length; i++) {
-			if (crossoverFlag2) {
-				i--;
-			} else {
+		crossoverFlag3 = false;
+		while (i < firstLogicalSchemeAll.length) {
+			if (!crossoverFlag2) {
 				s = new Array();
 				r.push(s);
 			}
 			crossoverFlag1 = false;
 			for (t = 0; t < crossoverAddresses1.length; t++) {
-				if (crossoverAddresses1[t] != null) {
-					if (i == crossoverAddresses1[t]) {
-						crossoverFlag1 = true;
-						if (!crossoverDirection) {
-							if (firstLogicalSchemeAll[i].length > 0 ) {
-								m = crossoverAddresses2[t] * (firstLogicalSchemeAll[i].length - 1);
-								n = (m - Math.floor(m));
-								m = Math.round(m);
-								if (firstLogicalSchemeAll[i][m].length > 0 ) {
-									n *= (firstLogicalSchemeAll[i][m].length - 1);
-									n = Math.round(n);
-								}
-							}
-						} else {
-							if (secondLogicalSchemeAll[i].length > 0 ) {
-								m = crossoverAddresses2[t] * (secondLogicalSchemeAll[i].length - 1);
-								n = (m - Math.floor(m));
-								m = Math.round(m);
-								if (secondLogicalSchemeAll[i][m].length > 0 ) {
-									n *= (secondLogicalSchemeAll[i][m].length - 1);
-									n = Math.round(n);
-								}
-							}
-						}
-						crossoverAddresses1[t] = null;
-						break;
+				if ((crossoverAddresses1[t] != null) && (i == crossoverAddresses1[t])) {
+					crossoverFlag1 = true;
+					if (!crossoverDirection) {
+						initCrossoverAddresses(firstLogicalSchemeAll);
+					} else {
+						initCrossoverAddresses(secondLogicalSchemeAll);
 					}
+					crossoverAddresses1[t] = null;
+					break;
 				}
 			}
 			if ((i >= transferDestinationIndex) && (i <= transferDestinationEndIndex)) {
 				t = i - transferOffset;
-				for ( ; j < firstLogicalSchemeAll[t].length; j++) {
+				while (j < firstLogicalSchemeAll[t].length) {
 					sor = new Array();
 					r[i].push(sor);
-					for ( ; k < firstLogicalSchemeAll[t][j].length; k++) {
+					while (k < firstLogicalSchemeAll[t][j].length) {
 						sand = new ElementOfScheme();
 						sand.number = firstLogicalSchemeAll[t][j][k].number;
-						sand.negative = firstLogicalSchemeAll[t][j][k].negative;
+						sand.negation = firstLogicalSchemeAll[t][j][k].negation;
 						r[i][j].push(sand);
+						k++;
 					}
 					k = 0;
+					j++;
 				}
 				j = 0;
 				if (crossoverFlag1) {
 					crossoverDirection = !crossoverDirection;
 				}
+				i++;
 				continue;
 			}
 			if (!crossoverDirection) {
-				for ( ; j < firstLogicalSchemeAll[i].length; j++) {
-					if (crossoverFlag2) {
-						crossoverFlag2 = false;
-					} else {
-						sor = new Array();
-						r[i].push(sor);
-					}	
-					for ( ; k < firstLogicalSchemeAll[i][j].length; k++) {
-						if (crossoverFlag1 && (m == j) && (n == k)) {
-							crossoverFlag2 = true;
-							break;
-						}
-						sand = new ElementOfScheme();
-						if (mutationCount == 0) {
-							sand.number = Math.round(Math.random() * maxi * 2);
-							if ((sand.number % 2) == 0) {
-								sand.negative = false;
-							} else {
-								sand.negative = true;
-							}
-							sand.number >>= 1;
-							mutationCount = Math.round(Math.random() * u);
-						} else {
-							sand.number = firstLogicalSchemeAll[i][j][k].number;
-							if ((sand.number >= transferSourceIndex) && (sand.number <= transferSourceEndIndex) && transferDirection) {
-								sand.number += transferOffset;
-								transferDirection = !transferDirection;
-							}
-							sand.negative = firstLogicalSchemeAll[i][j][k].negative;
-							mutationCount--;
-						}
-						r[i][j].push(sand);
-					}
-					if (crossoverFlag2) {
-						break;
-					} else {
-						k = 0;
-					}
-				}
-				if (crossoverFlag2) {
-					crossoverDirection = true;
-				} else {
-					j = 0;
-				}
+				iterateThroughScheme(firstLogicalSchemeAll);
 			} else {
-				for ( ; j < secondLogicalSchemeAll[i].length; j++) {
-					if (crossoverFlag2) {
-						crossoverFlag2 = false;
-					} else {
-						sor = new Array();
-						r[i].push(sor);
-					}
-					for ( ; k < secondLogicalSchemeAll[i][j].length; k++) {
-						if (crossoverFlag1 && (m == j) && (n == k)) {
-							crossoverFlag2 = true;
-							break;
-						}
-						sand = new ElementOfScheme();
-						if (mutationCount == 0) {
-							sand.number = Math.round(Math.random() * maxi * 2);
-							if ((sand.number % 2) == 0) {
-								sand.negative = false;
-							} else {
-								sand.negative = true;
-							}
-							sand.number >>= 1;
-							mutationCount = Math.round(Math.random() * u);
-						} else {
-							sand.number = secondLogicalSchemeAll[i][j][k].number;
-							if ((sand.number >= transferSourceIndex) && (sand.number <= transferSourceEndIndex) && transferDirection) {
-								sand.number += transferOffset;
-								transferDirection = !transferDirection;
-							}
-							sand.negative = secondLogicalSchemeAll[i][j][k].negative;
-							mutationCount--;
-						}
-						r[i][j].push(sand);
-					}
-					if (crossoverFlag2) {
-						break;
-					} else {
-						k = 0;
-					}
-				}
-				if (crossoverFlag2) {
-					crossoverDirection = false;
-				} else {
-					j = 0;
-				}
+				iterateThroughScheme(secondLogicalSchemeAll);
 			}
+			if (!crossoverFlag2) { i++; }
 		}
 		
 		u = 8;
@@ -949,14 +826,7 @@ function AIModule(areaX, areaY)
 			} else {
 				if (t < 0.20) {
 					sor = new Array();
-					sand = new ElementOfScheme();
-					sand.number = Math.round(Math.random() * maxi * 2);
-					if ((sand.number % 2) == 0) {
-						sand.negative = false;
-					} else {
-						sand.negative = true;
-					}
-					sand.number >>= 1;
+					sand = createElementOfScheme(maxi);
 					sor.push(sand);
 					r[i].push(sor);
 				} else {
@@ -972,15 +842,8 @@ function AIModule(areaX, areaY)
 						}
 					} else {
 						if (r[i].length > 0) {
-							sand = new ElementOfScheme();
 							j = Math.round(t * (r[i].length - 1));
-							sand.number = Math.round(Math.random() * maxi * 2);
-							if ((sand.number % 2) == 0) {
-								sand.negative = false;
-							} else {
-								sand.negative = true;
-							}
-							sand.number >>= 1;
+							sand = createElementOfScheme(maxi);
 							r[i][j].push(sand);
 						}
 					}
@@ -994,9 +857,79 @@ function AIModule(areaX, areaY)
 		return r;
 	}
 
+	function calculateScheme(logicalScheme, asensor, amemory)
+	{
+		var i, j, ne, nm, nx, r;
+		
+		r = false;
+		for (i = 0; i < logicalScheme.length; i++) {
+			r = true;
+			for (j = 0; j < logicalScheme[i].length; j++) {
+				nm = logicalScheme[i][j].number;
+				if (nm < asensor.bitField.length) {
+					nx = asensor.bitField[nm];
+				} else {
+					nm -= asensor.bitField.length;
+					nx = amemory.bitField[nm];
+				}
+				ne = logicalScheme[i][j].negation;
+				if (!(ne || nx)) { r = false; break; }
+				if (ne && nx) { r = false; break; }
+			}
+			if (r) { break; }
+		}
+		
+		return r;
+	}
+
+	function calculateAllScheme(destination, logicalSchemes, asensor, amemory)
+	{
+		for (var k = 0; k < logicalSchemes.length; k++) {
+			destination.bitField[k] = calculateScheme(logicalSchemes[k], asensor, amemory);
+		}
+		
+		return false;
+	}
+
+	function calculateAllSchemeExtra(endMemory, logicalSchemes, asensor, startMemory)
+	{
+		var i, k;
+		var temporaryMemory;
+		
+		calculateAllScheme(endMemory, logicalSchemes, asensor, startMemory);
+		i = endMemory.bitField.length - 2;
+		while (i > 0) {
+			temporaryMemory = new BitFieldMemory(i);
+			for (k = 0; k < i; k++) {
+				temporaryMemory.bitField[k] = calculateScheme(logicalSchemes[k], asensor, endMemory);
+			}
+			endMemory.copyPartial(temporaryMemory, 0, 0, i)
+			i -= 2;
+		}
+		
+		return false;
+	}
+
+	function createMemory(memoryLen)
+	{
+		var r = new BitFieldMemory(memoryLen);
+		var v;
+		
+		for (var i = 0; i < memoryLen; i++) {
+			v = Math.round(Math.random());
+			if (v == 0) {
+				r.bitField[i] = false;
+			} else {
+				r.bitField[i] = true;
+			}
+		}
+		
+		return r;
+	}
+
 	function createMemoryByGeneAlgorithm(firstMemory, secondMemory)
 	{
-		var r = new Array();
+		var r = new BitFieldMemory(firstMemory.bitField.length);
 		var crossoverAddresses = [];
 		var mutationCount;
 		var crossoverDirection;
@@ -1011,13 +944,13 @@ function AIModule(areaX, areaY)
 		t = t - Math.floor(t);
 		u = Math.round(t * 7) + 1;
 		for (i = 0; i < u; i++) {
-			t = Math.random() * (firstMemory.length - 1);
+			t = Math.random() * (firstMemory.bitField.length - 1);
 			crossoverAddresses.push(Math.round(t));
 		}
 		u = 4;
 		mutationCount = Math.round(Math.random() * u);
 
-		for (i = 0; i < firstMemory.length; i++) {
+		for (i = 0; i < firstMemory.bitField.length; i++) {
 			for (t = 0; t < crossoverAddresses.length; t++) {
 				if (crossoverAddresses[t] != null) {
 					if (i == crossoverAddresses[t]) {
@@ -1027,20 +960,20 @@ function AIModule(areaX, areaY)
 					}
 				}
 			}
-			// TO DO or not to do transfer 
+			// TODO or not to do transfer 
 			if (mutationCount == 0) {
 				t = Math.round(Math.random());
 				if (t == 0) {
-					r.push(false);
+					r.bitField[i] = false;
 				} else {
-					r.push(true);
+					r.bitField[i] = true;
 				}
 				mutationCount = Math.round(Math.random() * u);
 			} else {
 				if (!crossoverDirection) {
-					r.push(firstMemory[i]);
+					r.bitField[i] = firstMemory.bitField[i];
 				} else {
-					r.push(secondMemory[i]);
+					r.bitField[i] = secondMemory.bitField[i];
 				}
 				mutationCount--;
 			}
@@ -1122,7 +1055,7 @@ function AIModule(areaX, areaY)
 		
 		asensor.setArea(currentArea);
 		asensor.setPuzzle(currentPuzzle, currentArea);
-		asensor.setNextPuzzle(currentPuzzle.puzzles[currentPuzzle.nextType], self.biggestPuzzleYLength, self.biggestPuzzleXLength);
+		asensor.setNextPuzzle(currentPuzzle.puzzles[currentPuzzle.nextType]);
 		asensor.setScore(currentStats.getScore());
 		asensor.setLines(currentStats.getLines());
 		
@@ -1141,7 +1074,7 @@ function AIModule(areaX, areaY)
 			worstAngel = ratingTable[i].key;
 			this.angels[worstAngel].schemeForProjection = createSchemeByGeneAlgorithm(this.angels[firstBestAngel].schemeForProjection, this.angels[secondBestAngel].schemeForProjection, Angel.maxSchemeIndex);
 			this.angels[worstAngel].schemeForMemory = createSchemeByGeneAlgorithm(this.angels[firstBestAngel].schemeForMemory, this.angels[secondBestAngel].schemeForMemory, Angel.maxSchemeIndex);
-			this.angels[worstAngel].memory.copyFromArray(createMemoryByGeneAlgorithm(this.angels[firstBestAngel].memory, this.angels[secondBestAngel].memory));
+			this.angels[worstAngel].memory = createMemoryByGeneAlgorithm(this.angels[firstBestAngel].memory, this.angels[secondBestAngel].memory);
 			this.angels[worstAngel].timer = 0;
 			this.angels[worstAngel].projections = [];
 			this.angels[worstAngel].projectionStartCount = 0;
@@ -1164,7 +1097,7 @@ function AIModule(areaX, areaY)
 			worstSoul = ratingTable[0].key;
 			this.souls[worstSoul].schemeForPlan = createSchemeByGeneAlgorithm(this.souls[firstBestSoul].schemeForPlan, this.souls[secondBestSoul].schemeForPlan, Soul.maxSchemeIndex);
 			this.souls[worstSoul].schemeForMemory = createSchemeByGeneAlgorithm(this.souls[firstBestSoul].schemeForMemory, this.souls[secondBestSoul].schemeForMemory, Soul.maxSchemeIndex);
-			this.souls[worstSoul].memory.copyFromArray(createMemoryByGeneAlgorithm(this.souls[firstBestSoul].memory, this.souls[secondBestSoul].memory));
+			this.souls[worstSoul].memory = createMemoryByGeneAlgorithm(this.souls[firstBestSoul].memory, this.souls[secondBestSoul].memory);
 			this.souls[worstSoul].doPlanningCycle(this.angels[firstBestAngel], asensor);
 			grd = new ElementOfMap();
 			grd.value = this.souls[worstSoul].suggestedPlan.getDesirability(this.angels[firstBestAngel], asensor);

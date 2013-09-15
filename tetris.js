@@ -37,7 +37,7 @@ function Tetris()
 	this.areaAccel = null;
 
 	this.paused = true;
-	this.training = true;
+	this.training = false;
 	this.gameOverFlag = true;
 	this.i;
 
@@ -48,6 +48,8 @@ function Tetris()
 	
 	this.start = function()
 	{
+		if (self.training == true) { return; }
+		if (self.gameOverFlag != true) { return; }
 		document.getElementById("tetris-keys").style.display = "none";
 		document.getElementById("tetris-a-stats").style.display = "none";
 		document.getElementById("tetris-gameover").style.display = "none";
