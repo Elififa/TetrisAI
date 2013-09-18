@@ -1,6 +1,6 @@
 /*
  * PROJECT:  AIModule
- * VERSION:  0.01
+ * VERSION:  0.03
  * LICENSE:  GNU GPL v3 (LICENSE.txt)
  * AUTHOR:  (c) 2013 Eugene Zavidovsky
  * LINK:  https://github.com/Eug145/TetrisAI
@@ -42,6 +42,8 @@ function AIModule(areaX, areaY)
 					continue;
 				}
 				q = this.projections[j].aprojectedSensor.getScore();
+				q++;
+				s++;
 				if (s < q) {
 					g = s / q;
 				} else {
@@ -106,14 +108,24 @@ function AIModule(areaX, areaY)
 			return false;
 		}
 		
-		this.update = function(currentSensor, aplan)
+		this.update = function()
 		{
-			var j, d, t;
-			var prj;
+			var j;
 			
 			for (j = 0; j < this.projections.length; j++) {
 				this.projections[j].timer++;
 			}
+			this.timer++;
+			
+			return false;
+		}
+		
+		
+		this.makeProjections = function(currentSensor, aplan)
+		{
+			var j, t, d;
+			var prj;
+			
 			for (j = 1; j < this.projections.length; j++) {
 				t = this.projections[j].timer;
 				d = t >> 2;
@@ -136,8 +148,6 @@ function AIModule(areaX, areaY)
 					this.projections.splice(1, 1);
 				}
 			}
-			
-			this.timer++;
 			
 			return false;
 		}
@@ -390,16 +400,16 @@ function AIModule(areaX, areaY)
 			var temporaryMemory;
 			
 			hasReject = false;
-			hasUpdate = true;
+			hasUpdate = false;
 			for (k = 0; k < this.passivePlan.actions.length; k++) {
 				if (this.passivePlan.actions[k].actionTimer == this.timer) {
 					y = this.passivePlan.actions[k].actionCode;
 					if ((y != AIModule.undefinedActionCode1) && (y != AIModule.undefinedActionCode2)) {
 						if (y != actionCode) {
 							hasReject = true;
+						} else {
+							hasUpdate = true;
 						}
-					} else {
-						hasUpdate = false;
 					}
 					break;
 				}
@@ -1005,10 +1015,8 @@ function AIModule(areaX, areaY)
 	
 	Angel.schemeForProjectionLength = Sensor.scoreSize;
 	Angel.scoreSchemeAddress = 0;
-	Angel.memorySize = 32;
+	Angel.memorySize = 256;
 	Angel.maxSchemeIndex = Sensor.size + Angel.memorySize - 1;
-	Angel.hugeTimer = 24;
-	Angel.bigTimer = Math.round(0.8 * Angel.hugeTimer);
 	Angel.maxProjectionsTimer = 24;
 	Angel.portfolioLength = 12;
 	Angel.projectionsLength = 8;	
@@ -1018,7 +1026,7 @@ function AIModule(areaX, areaY)
 	ProjectedSensor.scoreAddress = 0;
 
 	AIModule.angelsNumber = 128;
-	AIModule.newAngelsNumber = Math.floor(AIModule.angelsNumber / Angel.hugeTimer + 1);
+	AIModule.newAngelsNumber = 64;
 
 	this.angels = new Array();
 	for (var i = 0; i < AIModule.angelsNumber; i++) {
@@ -1029,7 +1037,7 @@ function AIModule(areaX, areaY)
 	SuggestedActuators.timerSize = 5;
 	SuggestedActuators.size = Soul.planLength * (SuggestedActuators.timerSize + Sensor.actionSize);
 	Soul.schemeForPlanLength = Soul.planLength * (Sensor.actionSize + SuggestedActuators.timerSize);
-	Soul.memorySize = 32;
+	Soul.memorySize = 64;
 	Soul.maxSchemeIndex = Sensor.size - Sensor.actionSize - Sensor.timerSize + Soul.memorySize - 1;
 
 	AIModule.soulsNumber = 8;
@@ -1047,7 +1055,8 @@ function AIModule(areaX, areaY)
 	{
 		var asensor = new Sensor();
 		var grd;
-		var ratingTable = [];
+		var angelsRatingTable = [];
+		var soulsRatingTable = [];
 		var firstBestAngel, secondBestAngel, worstAngel;
 		var firstBestSoul, secondBestSoul, worstSoul;
 		var firstBestDesirability, activeDesirability;
@@ -1064,14 +1073,56 @@ function AIModule(areaX, areaY)
 			grd = new ElementOfMap();
 			grd.value = this.angels[i].getOverallAdequacy();
 			grd.key = i;
-			ratingTable.push(grd);
+			angelsRatingTable.push(grd);
+		}
+		angelsRatingTable.sort(compareElementsOfMap);
+		firstBestAngel = angelsRatingTable[angelsRatingTable.length - 1].key;
+		secondBestAngel = angelsRatingTable[angelsRatingTable.length - 2].key;
+		
+		for (i = 0; i < AIModule.soulsNumber; i++) {
+			this.souls[i].doPlanningCycle(this.angels[firstBestAngel], asensor);
+			grd = new ElementOfMap();
+			grd.value = this.souls[i].suggestedPlan.getDesirability(this.angels[firstBestAngel], asensor);
+			grd.key = i;
+			soulsRatingTable.push(grd);
+		}
+		soulsRatingTable.sort(compareElementsOfMap);
+		firstBestSoul = soulsRatingTable[soulsRatingTable.length - 1].key;
+		secondBestSoul = soulsRatingTable[soulsRatingTable.length - 2].key;
+		worstSoul = soulsRatingTable[0].key;
+		
+		for (i = 0; i < AIModule.newSoulsNumber; i++) {
+			this.souls[worstSoul].schemeForPlan = createSchemeByGeneAlgorithm(this.souls[firstBestSoul].schemeForPlan, this.souls[secondBestSoul].schemeForPlan, Soul.maxSchemeIndex);
+			this.souls[worstSoul].schemeForMemory = createSchemeByGeneAlgorithm(this.souls[firstBestSoul].schemeForMemory, this.souls[secondBestSoul].schemeForMemory, Soul.maxSchemeIndex);
+			this.souls[worstSoul].memory = createMemoryByGeneAlgorithm(this.souls[firstBestSoul].memory, this.souls[secondBestSoul].memory);
+			this.souls[worstSoul].doPlanningCycle(this.angels[firstBestAngel], asensor);
+			grd = new ElementOfMap();
+			grd.value = this.souls[worstSoul].suggestedPlan.getDesirability(this.angels[firstBestAngel], asensor);
+			grd.key = worstSoul;
+			soulsRatingTable.splice(0, 1);
+			soulsRatingTable.push(grd);
+			soulsRatingTable.sort(compareElementsOfMap);
+			firstBestSoul = soulsRatingTable[soulsRatingTable.length - 1].key;
+			secondBestSoul = soulsRatingTable[soulsRatingTable.length - 2].key;
+			worstSoul = soulsRatingTable[0].key;
 		}
 		
-		ratingTable.sort(compareElementsOfMap);
-		firstBestAngel = ratingTable[ratingTable.length - 1].key;
-		secondBestAngel = ratingTable[ratingTable.length - 2].key;
+		this.activePlan.update();
+		this.activeConvergedPlan.update();
+		activeDesirability = this.activePlan.getDesirability(this.angels[firstBestAngel], asensor);
+		firstBestDesirability = soulsRatingTable[soulsRatingTable.length - 1].value;
+		if (firstBestDesirability > activeDesirability) {
+			this.activePlan = this.souls[firstBestSoul].suggestedPlan.clone();
+			this.activeConvergedPlan = this.souls[firstBestSoul].suggestedPlan.convergeWith(this.activeConvergedPlan);
+		} else {
+			this.activeConvergedPlan = this.activeConvergedPlan.convergeWith(this.souls[firstBestSoul].suggestedPlan);
+		}
+		
+		for (i = AIModule.newAngelsNumber; i < AIModule.angelsNumber; i++) {
+			this.angels[angelsRatingTable[i].key].update();
+		}
 		for (i = 0; i < AIModule.newAngelsNumber; i++) {
-			worstAngel = ratingTable[i].key;
+			worstAngel = angelsRatingTable[i].key;
 			this.angels[worstAngel].schemeForProjection = createSchemeByGeneAlgorithm(this.angels[firstBestAngel].schemeForProjection, this.angels[secondBestAngel].schemeForProjection, Angel.maxSchemeIndex);
 			this.angels[worstAngel].schemeForMemory = createSchemeByGeneAlgorithm(this.angels[firstBestAngel].schemeForMemory, this.angels[secondBestAngel].schemeForMemory, Angel.maxSchemeIndex);
 			this.angels[worstAngel].memory = createMemoryByGeneAlgorithm(this.angels[firstBestAngel].memory, this.angels[secondBestAngel].memory);
@@ -1080,45 +1131,8 @@ function AIModule(areaX, areaY)
 			this.angels[worstAngel].projectionStartCount = 0;
 			this.angels[worstAngel].copyPortfolio(this.angels[firstBestAngel]);
 		}
-		
-		ratingTable = [];
-		for (i = 0; i < AIModule.soulsNumber; i++) {
-			this.souls[i].doPlanningCycle(this.angels[firstBestAngel], asensor);
-			grd = new ElementOfMap();
-			grd.value = this.souls[i].suggestedPlan.getDesirability(this.angels[firstBestAngel], asensor);
-			grd.key = i;
-			ratingTable.push(grd);
-		}
-		
-		for (i = 0; i < AIModule.newSoulsNumber; i++) {
-			ratingTable.sort(compareElementsOfMap);
-			firstBestSoul = ratingTable[ratingTable.length - 1].key;
-			secondBestSoul = ratingTable[ratingTable.length - 2].key;
-			worstSoul = ratingTable[0].key;
-			this.souls[worstSoul].schemeForPlan = createSchemeByGeneAlgorithm(this.souls[firstBestSoul].schemeForPlan, this.souls[secondBestSoul].schemeForPlan, Soul.maxSchemeIndex);
-			this.souls[worstSoul].schemeForMemory = createSchemeByGeneAlgorithm(this.souls[firstBestSoul].schemeForMemory, this.souls[secondBestSoul].schemeForMemory, Soul.maxSchemeIndex);
-			this.souls[worstSoul].memory = createMemoryByGeneAlgorithm(this.souls[firstBestSoul].memory, this.souls[secondBestSoul].memory);
-			this.souls[worstSoul].doPlanningCycle(this.angels[firstBestAngel], asensor);
-			grd = new ElementOfMap();
-			grd.value = this.souls[worstSoul].suggestedPlan.getDesirability(this.angels[firstBestAngel], asensor);
-			grd.key = worstSoul;
-			ratingTable.splice(0, 1);
-			ratingTable.push(grd);
-		}
-		
-		this.activePlan.update();
-		this.activeConvergedPlan.update();
-		activeDesirability = this.activePlan.getDesirability(this.angels[firstBestAngel], asensor);
-		firstBestDesirability = ratingTable[ratingTable.length - 1].value;
-		if (firstBestDesirability > activeDesirability) {
-			this.activePlan = this.souls[firstBestSoul].suggestedPlan.clone();
-			this.activeConvergedPlan = this.souls[firstBestSoul].suggestedPlan.convergeWith(this.activeConvergedPlan);
-		} else {
-			this.activeConvergedPlan = this.activeConvergedPlan.convergeWith(this.souls[firstBestSoul].suggestedPlan);
-		}
-		
-		for (i = 0; i < this.angels.length; i++) {
-			this.angels[i].update(asensor, this.activePlan);
+		for (i = 0; i < AIModule.angelsNumber; i++) {
+			this.angels[i].makeProjections(asensor, this.activePlan);
 		}
 		
 		if (this.activeConvergedPlan.actions[0].actionTimer == 0) {

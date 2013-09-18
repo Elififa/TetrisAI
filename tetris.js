@@ -1,6 +1,6 @@
 /*
  * PROJECT:  JsTetris
- * VERSION:  1.19
+ * VERSION:  1.19-AI003
  * LICENSE:  BSD (revised)
  * AUTHOR:  (c) 2004-2009 Cezary Tomczak
  * LINK:  http://www.gosu.pl/tetris/
@@ -11,7 +11,7 @@
 
 /*
  * NOTE: This file differs from the original.
- *       Modified to run AI module (see a file AIModule.js).
+ *       Modified to execute with AI module (see a file AIModule.js).
  */
 
 
@@ -39,7 +39,7 @@ function Tetris()
 	this.paused = true;
 	this.training = false;
 	this.gameOverFlag = true;
-	this.i;
+	this.trainingGamesCounter;
 
 	/**
 	 * @return void
@@ -63,18 +63,10 @@ function Tetris()
 		document.getElementById('tetris-pause').style.display = 'block';
 		document.getElementById('tetris-resume').style.display = 'none';
 		self.training = true;
-		self.i = 0;
+		self.trainingGamesCounter = 0;
 		self.statsAccel.setGamesCount(0);
 		self.gameOverFlag = false;
-		self.areaAccel = new AreaAccel(self.areaX, self.areaY);
-		self.puzzleAccel = new PuzzleAccel(self, self.areaAccel);
-		if (self.areaAccel && self.puzzleAccel && self.puzzleAccel.mayPlace()) {
-			self.puzzleAccel.place();
-		} else {
-			self.gameOverFlag = true;
-		}
-		self.anAIModule.prepareForANewGame();
-		self.continueATrainingGame();
+		self.continueStart();
 	};
 	
 	this.continueATrainingGame = function()
@@ -92,16 +84,16 @@ function Tetris()
 			}
 			setTimeout(self.continueATrainingGame, 10);
 		} else {
+			self.statsAccel.incGamesCount();
+			self.statsAccel.setActionsCount(0);
+			self.trainingGamesCounter++;
 			self.continueStart();
 		}
 	};
 
 	this.continueStart = function()
 	{
-		self.statsAccel.incGamesCount();
-		self.statsAccel.setActionsCount(0);
-		self.i++;
-		if (self.i < self.trainingGamesNumber) {
+		if (self.trainingGamesCounter < self.trainingGamesNumber) {
 			self.gameOverFlag = false;
 			self.areaAccel = new AreaAccel(self.areaX, self.areaY);
 			self.puzzleAccel = new PuzzleAccel(self, self.areaAccel);
