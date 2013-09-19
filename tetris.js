@@ -1,6 +1,6 @@
 /*
  * PROJECT:  JsTetris
- * VERSION:  1.19-AI003
+ * VERSION:  1.19-AI004
  * LICENSE:  BSD (revised)
  * AUTHOR:  (c) 2004-2009 Cezary Tomczak
  * LINK:  http://www.gosu.pl/tetris/

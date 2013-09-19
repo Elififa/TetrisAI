@@ -1,6 +1,6 @@
 /*
  * PROJECT:  AIModule
- * VERSION:  0.03
+ * VERSION:  0.04
  * LICENSE:  GNU GPL v3 (LICENSE.txt)
  * AUTHOR:  (c) 2013 Eugene Zavidovsky
  * LINK:  https://github.com/Eug145/TetrisAI
@@ -166,9 +166,7 @@ function AIModule(areaX, areaY)
 			var temporarySoulMemory;
 			var asuggestedActuators = new SuggestedActuators();
 			
-			temporarySoulMemory = this.memory.clone();
-			calculateAllSchemeExtra(temporarySoulMemory, this.schemeForMemory, currentSensor, this.memory);
-			this.memory.copy(temporarySoulMemory);
+			calculateAllSchemeExtra(this.memory, this.schemeForMemory, currentSensor, this.memory);
 			for (j = 0; j < Soul.schemeForPlanLength; j++) {
 				asuggestedActuators.bitField[j] = calculateScheme(this.schemeForPlan[j], currentSensor, this.memory);
 			}
@@ -359,7 +357,7 @@ function AIModule(areaX, areaY)
 		
 		this.getPlan = function()
 		{
-			var j, k, z;
+			var j, k;
 			var r = new Plan();
 			var act;
 			
@@ -467,8 +465,7 @@ function AIModule(areaX, areaY)
 		this.getDesirability = function(anAngel, currentSensor)
 		{
 			var r, k, t;
-			var pln = new Plan();
-			var prj = new Projection(anAngel, currentSensor, pln);
+			var prj = new Projection(anAngel, currentSensor, this);
 			
 			r = 0;
 			for (k = 0; k < this.actions.length; k++) {
@@ -892,22 +889,12 @@ function AIModule(areaX, areaY)
 		return r;
 	}
 
-	function calculateAllScheme(destination, logicalSchemes, asensor, amemory)
-	{
-		for (var k = 0; k < logicalSchemes.length; k++) {
-			destination.bitField[k] = calculateScheme(logicalSchemes[k], asensor, amemory);
-		}
-		
-		return false;
-	}
-
 	function calculateAllSchemeExtra(endMemory, logicalSchemes, asensor, startMemory)
 	{
 		var i, k;
 		var temporaryMemory;
 		
-		calculateAllScheme(endMemory, logicalSchemes, asensor, startMemory);
-		i = endMemory.bitField.length - 2;
+		i = endMemory.bitField.length;
 		while (i > 0) {
 			temporaryMemory = new BitFieldMemory(i);
 			for (k = 0; k < i; k++) {
