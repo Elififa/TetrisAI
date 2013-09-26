@@ -1,6 +1,6 @@
 /*
  * PROJECT:  AIModule
- * VERSION:  0.04
+ * VERSION:  0.05
  * LICENSE:  GNU GPL v3 (LICENSE.txt)
  * AUTHOR:  (c) 2013 Eugene Zavidovsky
  * LINK:  https://github.com/Eug145/TetrisAI
@@ -30,6 +30,7 @@ function AIModule(areaX, areaY)
 		this.portfolio = [];
 		this.projectionStartCount = 0;
 		this.timer = 0;
+		this.isNotScanned;
 		
 		this.doProjectionCycle = function(actionCode, currentSensor) 
 		{	
@@ -92,29 +93,27 @@ function AIModule(areaX, areaY)
 			return r;
 		}
 		
-		this.copyPortfolio = function(sourceAngel)
+		this.getPartialAdequacy = function(len)
 		{
-			var i;
-			var pfo;
+			var j, r, t;
 			
-			this.portfolio = [];
-			for (i = 0; i < sourceAngel.portfolio.length; i++) {
-				pfo = new ElementOfPortfolio();
-				pfo.total = sourceAngel.portfolio[i].total / sourceAngel.portfolio[i].count;
-				pfo.count = Angel.portfolioInheritance;
-				this.portfolio.push(pfo);
+			r = 0;
+			for (j = 0; j < len; j++) {
+				t = this.portfolio[j].total;
+				r += t / this.portfolio[j].count;
 			}
 			
-			return false;
+			return r;
 		}
 		
-		this.update = function()
+		this.update = function(asensor)
 		{
 			var j;
 			
 			for (j = 0; j < this.projections.length; j++) {
 				this.projections[j].timer++;
 			}
+			calculateAllSchemeExtra(this.schemeForMemory, asensor, this.memory);
 			this.timer++;
 			
 			return false;
@@ -160,13 +159,13 @@ function AIModule(areaX, areaY)
 		this.memory = createMemory(Soul.memorySize);
 		this.suggestedPlan = [];
 		
-		this.doPlanningCycle = function(anAngel, currentSensor)
+		this.doPlanningCycle = function(currentSensor)
 		{
 			var j;
 			var temporarySoulMemory;
 			var asuggestedActuators = new SuggestedActuators();
 			
-			calculateAllSchemeExtra(this.memory, this.schemeForMemory, currentSensor, this.memory);
+			calculateAllSchemeExtra(this.schemeForMemory, currentSensor, this.memory);
 			for (j = 0; j < Soul.schemeForPlanLength; j++) {
 				asuggestedActuators.bitField[j] = calculateScheme(this.schemeForPlan[j], currentSensor, this.memory);
 			}
@@ -418,7 +417,7 @@ function AIModule(areaX, areaY)
 			this.asensor.setAction(actionCode);
 			this.asensor.setTimer(this.timer);
 			temporaryMemory = this.memory.clone();
-			calculateAllSchemeExtra(temporaryMemory, this.parentAngel.schemeForMemory, this.asensor, this.memory);
+			calculateAllSchemeExtra(this.parentAngel.schemeForMemory, this.asensor, temporaryMemory);
 			for (k = 0; k < Sensor.scoreSize; k++) {
 				this.aprojectedSensor.bitField[ProjectedSensor.scoreAddress + k] = calculateScheme(this.parentAngel.schemeForProjection[Angel.scoreSchemeAddress + k], this.asensor, temporaryMemory);
 			}
@@ -546,15 +545,6 @@ function AIModule(areaX, areaY)
 			return false;
 		}
 		
-		this.copyFromArray = function(source)
-		{
-			for (var k = 0; k < source.length; k++) {
-				this.bitField[k] = source[k];
-			}
-			
-			return false;
-		}
-		
 		this.copyPartial = function(source, startFrom, startTo, len)
 		{
 			for (var k = 0; k < len; k++) {
@@ -667,7 +657,7 @@ function AIModule(areaX, areaY)
 
 	function createSchemeByGeneAlgorithm(firstLogicalSchemeAll, secondLogicalSchemeAll, maxi)
 	{
-		function iterateThroughScheme(logicalSchemeAll)
+		function goCrossoverScheme(logicalSchemeAll)
 		{
 			if (crossoverFlag2) { crossoverFlag3 = true; }
 			crossoverFlag2 = false;
@@ -809,9 +799,9 @@ function AIModule(areaX, areaY)
 				continue;
 			}
 			if (!crossoverDirection) {
-				iterateThroughScheme(firstLogicalSchemeAll);
+				goCrossoverScheme(firstLogicalSchemeAll);
 			} else {
-				iterateThroughScheme(secondLogicalSchemeAll);
+				goCrossoverScheme(secondLogicalSchemeAll);
 			}
 			if (!crossoverFlag2) { i++; }
 		}
@@ -889,19 +879,19 @@ function AIModule(areaX, areaY)
 		return r;
 	}
 
-	function calculateAllSchemeExtra(endMemory, logicalSchemes, asensor, startMemory)
+	function calculateAllSchemeExtra(logicalSchemes, asensor, amemory)
 	{
 		var i, k;
 		var temporaryMemory;
 		
-		i = endMemory.bitField.length;
+		i = amemory.bitField.length;
 		while (i > 0) {
 			temporaryMemory = new BitFieldMemory(i);
 			for (k = 0; k < i; k++) {
-				temporaryMemory.bitField[k] = calculateScheme(logicalSchemes[k], asensor, endMemory);
+				temporaryMemory.bitField[k] = calculateScheme(logicalSchemes[k], asensor, amemory);
 			}
-			endMemory.copyPartial(temporaryMemory, 0, 0, i)
-			i -= 2;
+			amemory.copyPartial(temporaryMemory, 0, 0, i)
+			i -= AIModule.memoryCycleNumber;
 		}
 		
 		return false;
@@ -985,6 +975,7 @@ function AIModule(areaX, areaY)
 	AIModule.biggestPuzzleYLength = 4;
 	AIModule.schemeOrSize = 4;
 	AIModule.schemeAndSize = 8;
+	AIModule.memoryCycleNumber = 8;
 
 	Sensor.areaSize = areaY * areaX;
 	Sensor.nextPuzzleSize = AIModule.biggestPuzzleXLength * AIModule.biggestPuzzleYLength;
@@ -1008,12 +999,12 @@ function AIModule(areaX, areaY)
 	Angel.portfolioLength = 12;
 	Angel.projectionsLength = 8;	
 	Angel.maxProjectionCreatingInterval = 2;	
-	Angel.portfolioInheritance = 1;
+	Angel.neglectedAgeDifference = 0.03;
 	ProjectedSensor.size = Sensor.scoreSize;
 	ProjectedSensor.scoreAddress = 0;
 
 	AIModule.angelsNumber = 128;
-	AIModule.newAngelsNumber = 64;
+	AIModule.newAngelsNumber = 0.34;
 
 	this.angels = new Array();
 	for (var i = 0; i < AIModule.angelsNumber; i++) {
@@ -1043,11 +1034,13 @@ function AIModule(areaX, areaY)
 		var asensor = new Sensor();
 		var grd;
 		var angelsRatingTable = [];
+		var angelsAgeGroups = [];
+		var angelsAgeGroupsCount, minPortfolioLength, theEdge;
 		var soulsRatingTable = [];
-		var firstBestAngel, secondBestAngel, worstAngel;
+		var mainAngel, firstBestAngel, secondBestAngel, worstAngel;
 		var firstBestSoul, secondBestSoul, worstSoul;
 		var firstBestDesirability, activeDesirability;
-		var r, i;
+		var r, i, j;
 		
 		asensor.setArea(currentArea);
 		asensor.setPuzzle(currentPuzzle, currentArea);
@@ -1057,19 +1050,23 @@ function AIModule(areaX, areaY)
 		
 		for (i = 0; i < AIModule.angelsNumber; i++) {
 			this.angels[i].doProjectionCycle(doneAction, asensor);
+			if (this.angels[i].portfolio.length == 0) {
+				this.angels[i].isNotScanned = false;
+			} else {
+				this.angels[i].isNotScanned = true;
+			}
 			grd = new ElementOfMap();
 			grd.value = this.angels[i].getOverallAdequacy();
 			grd.key = i;
 			angelsRatingTable.push(grd);
 		}
 		angelsRatingTable.sort(compareElementsOfMap);
-		firstBestAngel = angelsRatingTable[angelsRatingTable.length - 1].key;
-		secondBestAngel = angelsRatingTable[angelsRatingTable.length - 2].key;
+		mainAngel = angelsRatingTable[angelsRatingTable.length - 1].key;
 		
 		for (i = 0; i < AIModule.soulsNumber; i++) {
-			this.souls[i].doPlanningCycle(this.angels[firstBestAngel], asensor);
+			this.souls[i].doPlanningCycle(asensor);
 			grd = new ElementOfMap();
-			grd.value = this.souls[i].suggestedPlan.getDesirability(this.angels[firstBestAngel], asensor);
+			grd.value = this.souls[i].suggestedPlan.getDesirability(this.angels[mainAngel], asensor);
 			grd.key = i;
 			soulsRatingTable.push(grd);
 		}
@@ -1082,9 +1079,9 @@ function AIModule(areaX, areaY)
 			this.souls[worstSoul].schemeForPlan = createSchemeByGeneAlgorithm(this.souls[firstBestSoul].schemeForPlan, this.souls[secondBestSoul].schemeForPlan, Soul.maxSchemeIndex);
 			this.souls[worstSoul].schemeForMemory = createSchemeByGeneAlgorithm(this.souls[firstBestSoul].schemeForMemory, this.souls[secondBestSoul].schemeForMemory, Soul.maxSchemeIndex);
 			this.souls[worstSoul].memory = createMemoryByGeneAlgorithm(this.souls[firstBestSoul].memory, this.souls[secondBestSoul].memory);
-			this.souls[worstSoul].doPlanningCycle(this.angels[firstBestAngel], asensor);
+			this.souls[worstSoul].doPlanningCycle(asensor);
 			grd = new ElementOfMap();
-			grd.value = this.souls[worstSoul].suggestedPlan.getDesirability(this.angels[firstBestAngel], asensor);
+			grd.value = this.souls[worstSoul].suggestedPlan.getDesirability(this.angels[mainAngel], asensor);
 			grd.key = worstSoul;
 			soulsRatingTable.splice(0, 1);
 			soulsRatingTable.push(grd);
@@ -1096,7 +1093,7 @@ function AIModule(areaX, areaY)
 		
 		this.activePlan.update();
 		this.activeConvergedPlan.update();
-		activeDesirability = this.activePlan.getDesirability(this.angels[firstBestAngel], asensor);
+		activeDesirability = this.activePlan.getDesirability(this.angels[mainAngel], asensor);
 		firstBestDesirability = soulsRatingTable[soulsRatingTable.length - 1].value;
 		if (firstBestDesirability > activeDesirability) {
 			this.activePlan = this.souls[firstBestSoul].suggestedPlan.clone();
@@ -1105,18 +1102,51 @@ function AIModule(areaX, areaY)
 			this.activeConvergedPlan = this.activeConvergedPlan.convergeWith(this.souls[firstBestSoul].suggestedPlan);
 		}
 		
-		for (i = AIModule.newAngelsNumber; i < AIModule.angelsNumber; i++) {
-			this.angels[angelsRatingTable[i].key].update();
-		}
-		for (i = 0; i < AIModule.newAngelsNumber; i++) {
-			worstAngel = angelsRatingTable[i].key;
-			this.angels[worstAngel].schemeForProjection = createSchemeByGeneAlgorithm(this.angels[firstBestAngel].schemeForProjection, this.angels[secondBestAngel].schemeForProjection, Angel.maxSchemeIndex);
-			this.angels[worstAngel].schemeForMemory = createSchemeByGeneAlgorithm(this.angels[firstBestAngel].schemeForMemory, this.angels[secondBestAngel].schemeForMemory, Angel.maxSchemeIndex);
-			this.angels[worstAngel].memory = createMemoryByGeneAlgorithm(this.angels[firstBestAngel].memory, this.angels[secondBestAngel].memory);
-			this.angels[worstAngel].timer = 0;
-			this.angels[worstAngel].projections = [];
-			this.angels[worstAngel].projectionStartCount = 0;
-			this.angels[worstAngel].copyPortfolio(this.angels[firstBestAngel]);
+		asensor.setAction(doneAction);
+		asensor.setTimer(0);
+		angelsAgeGroupsCount = 0;
+		for (i = 0; i < (AIModule.angelsNumber - 2); i++) {
+			if (this.angels[i].isNotScanned == false) { continue; }
+			angelsAgeGroups.push(new Array());
+			angelsAgeGroups[angelsAgeGroupsCount].push(i);
+			this.angels[i].isNotScanned = false;
+			minPortfolioLength = this.angels[i].portfolio.length;
+			for (j = (i + 1); j < AIModule.angelsNumber; j++) {
+				if (this.angels[j].isNotScanned == false) { continue; }
+				if ((Math.abs(this.angels[i].timer - this.angels[j].timer) < Angel.neglectedAgeDifference * Math.max(this.angels[i].timer, this.angels[j].timer))) {
+					angelsAgeGroups[angelsAgeGroupsCount].push(j);
+					this.angels[j].isNotScanned = false;
+					if (this.angels[j].portfolio.length < minPortfolioLength) {
+						minPortfolioLength = this.angels[j].portfolio.length;
+					}
+				}
+			}
+			angelsRatingTable = [];
+			for (j = 0; j < angelsAgeGroups[angelsAgeGroupsCount].length; j++) {
+				grd = new ElementOfMap();
+				grd.key = angelsAgeGroups[angelsAgeGroupsCount][j];
+				grd.value = this.angels[grd.key].getPartialAdequacy(minPortfolioLength);
+				angelsRatingTable.push(grd);
+			}
+			angelsRatingTable.sort(compareElementsOfMap);
+			theEdge = Math.floor(AIModule.newAngelsNumber * angelsRatingTable.length);
+			for (j = theEdge; j < angelsRatingTable.length; j++) {
+				this.angels[angelsRatingTable[j].key].update(asensor);
+			}
+			angelsAgeGroupsCount++;
+			if (angelsRatingTable.length < 2) { continue; }
+			firstBestAngel = angelsRatingTable[angelsRatingTable.length - 1].key;
+			secondBestAngel = angelsRatingTable[angelsRatingTable.length - 2].key;
+			for (j = 0; j < theEdge; j++) {
+				worstAngel = angelsRatingTable[j].key;
+				this.angels[worstAngel].schemeForProjection = createSchemeByGeneAlgorithm(this.angels[firstBestAngel].schemeForProjection, this.angels[secondBestAngel].schemeForProjection, Angel.maxSchemeIndex);
+				this.angels[worstAngel].schemeForMemory = createSchemeByGeneAlgorithm(this.angels[firstBestAngel].schemeForMemory, this.angels[secondBestAngel].schemeForMemory, Angel.maxSchemeIndex);
+				this.angels[worstAngel].memory = createMemoryByGeneAlgorithm(this.angels[firstBestAngel].memory, this.angels[secondBestAngel].memory);
+				this.angels[worstAngel].timer = 0;
+				this.angels[worstAngel].projections = [];
+				this.angels[worstAngel].projectionStartCount = 0;
+				this.angels[worstAngel].portfolio = [];
+			}
 		}
 		for (i = 0; i < AIModule.angelsNumber; i++) {
 			this.angels[i].makeProjections(asensor, this.activePlan);

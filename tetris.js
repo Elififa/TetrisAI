@@ -1,6 +1,6 @@
 /*
  * PROJECT:  JsTetris
- * VERSION:  1.19-AI004
+ * VERSION:  1.19-AI005
  * LICENSE:  BSD (revised)
  * AUTHOR:  (c) 2004-2009 Cezary Tomczak
  * LINK:  http://www.gosu.pl/tetris/
@@ -24,7 +24,7 @@ function Tetris()
 	this.areaY = 22; // area height = y units
 
 	// parameters for AI
-	this.trainingGamesNumber = 3;
+	this.trainingGamesNumber = 50;
 	this.maxScore = 255;
 	this.actionOfAICycle = 6;
 	this.anAIModule = new AIModule(this.areaX, this.areaY);
